@@ -1,0 +1,10 @@
+version: "3.4"
+
+services:
+  dispresence:
+    image: dispresence
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      - TOKEN=your_token_here
