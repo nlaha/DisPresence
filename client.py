@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ext import tasks
 import os  # default module
 from dotenv import load_dotenv
 import pickledb
@@ -26,6 +27,8 @@ server_jobs = {}
 @bot.event
 async def on_ready():
     logging.info(f"{bot.user} is ready and online!")
+
+    schedule_task.start()
 
     # for each server, check if the bot is enabled
     for server_id in server_enables.getall():
@@ -77,11 +80,18 @@ async def enable(ctx):
         await ctx.respond("You need to be a server admin to use this command!")
         return
 
+    # make sure job isn't already running
+    job = server_jobs.get(str(ctx.guild_id))
+
+    if job is not None:
+        await ctx.respond("The bot is already enabled!")
+        return
+
     # start the scheduler
     job = (
         schedule.every()
         .sunday.at("17:00")
-        .do(presence.post_events, bot, ctx, server_channels)
+        .do(presence.post_events, bot, ctx.guild_id, server_channels)
     )
 
     # log
@@ -125,6 +135,11 @@ async def disable(ctx):
     await ctx.respond("The bot has been disabled!")
 
 
+@tasks.loop(seconds=1)
+async def schedule_task():
+    schedule.run_pending()
+
+
 @bot.slash_command(
     name="fetch",
     description="Overrides the scheduler and fetches events for the next 7 days right now",
@@ -137,7 +152,7 @@ async def fetch(ctx):
 
     # repond success
     await ctx.respond("Fetching events...")
-    await presence.post_events(bot, ctx, server_channels)
+    presence.post_events(bot, ctx.guild_id, server_channels)
 
 
 bot.run(os.getenv("TOKEN"))  # run the bot with the token

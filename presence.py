@@ -7,6 +7,7 @@ import datetime
 import logging
 from dateutil.tz import tzutc, tzlocal
 import re
+import asyncio
 
 
 # runs at 5:00pm PST on sundays, grabs events from https://api.presence.io/wsu/v1/events
@@ -59,9 +60,9 @@ def fetch_week_events():
     return filtered_events
 
 
-async def post_events(bot, ctx, server_channels):
+def post_events(bot, guild_id, server_channels):
     # get the configured channel id for the server
-    channel_id = server_channels.get(str(ctx.guild_id))
+    channel_id = server_channels.get(str(guild_id))
 
     # if the channel id is not set, send a message to the channel
     if channel_id is None:
@@ -83,8 +84,10 @@ async def post_events(bot, ctx, server_channels):
     # know what week the bot is posting events for.
     # posting n events for the week of m/d/y
 
-    await ctx.respond(
-        f"Posting {len(events)} events occurring this next week, after {datetime.datetime.now().strftime('%m/%d/%Y')}"
+    asyncio.create_task(
+        channel.send(
+            f"Posting {len(events)} events occurring this next week, after {datetime.datetime.now().strftime('%m/%d/%Y')}"
+        )
     )
 
     # loop through all the events
@@ -139,7 +142,7 @@ async def post_events(bot, ctx, server_channels):
             )
 
         # send the embed to the channel
-        await channel.send(embed=embed)
+        asyncio.create_task(channel.send(embed=embed))
 
         # wait 1 second before sending the next embed
         time.sleep(1)
