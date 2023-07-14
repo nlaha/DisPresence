@@ -1,4 +1,5 @@
 import discord
+from discord.ext import commands
 import os  # default module
 from dotenv import load_dotenv
 import pickledb
@@ -8,21 +9,23 @@ import datetime
 import presence
 
 load_dotenv()  # load all the variables from the env file
-bot = discord.AutoShardedBot()
+bot = discord.AutoShardedBot()  # create the bot
 
 # stores the configured event channel id for each server
-server_channels = pickledb.load("server_channels.db", False)
-server_enables = pickledb.load("server_enables.db", False)
+server_channels = pickledb.load("server_channels.db", True)
+server_enables = pickledb.load("server_enables.db", True)
 
 # configure logging
-logging.basicConfig(format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S")
+logging.basicConfig(
+    format="%(asctime)s - %(message)s", datefmt="%d-%b-%y %H:%M:%S", level=logging.INFO
+)
 
 server_jobs = {}
 
 
 @bot.event
 async def on_ready():
-    logging.log(f"{bot.user} is ready and online!")
+    logging.info(f"{bot.user} is ready and online!")
 
     # for each server, check if the bot is enabled
     for server_id in server_enables.getall():
@@ -45,7 +48,7 @@ async def hello(ctx):
 # set a channel to watch for new events
 @bot.slash_command(
     name="set-channel",
-    description="Set the channel that new presence events will be sent to",
+    description="Sets the current channel as the channel to post events to",
 )
 async def set_channel(ctx):
     if ctx.author.guild_permissions.administrator is False:
@@ -82,12 +85,15 @@ async def enable(ctx):
     )
 
     # log
-    logging.log(f"Enabled the bot for {ctx.guild_id}")
+    logging.info(f"Enabled the bot for {ctx.guild_id}")
 
     server_jobs[str(ctx.guild_id)] = job
 
     # save server enable status
     server_enables.set(str(ctx.guild_id), True)
+
+    # respond success
+    await ctx.respond("The bot has been enabled!")
 
 
 @bot.slash_command(
@@ -110,10 +116,28 @@ async def disable(ctx):
     job.cancel()
 
     # log
-    logging.log(f"Disabled the bot for {ctx.guild_id}")
+    logging.info(f"Disabled the bot for {ctx.guild_id}")
 
     # save server enable status
     server_enables.set(str(ctx.guild_id), False)
+
+    # respond success
+    await ctx.respond("The bot has been disabled!")
+
+
+@bot.slash_command(
+    name="fetch",
+    description="Overrides the scheduler and fetches events for the next 7 days right now",
+)
+async def fetch(ctx):
+    if ctx.author.guild_permissions.administrator is False:
+        # if the user is not an admin, send a message to the channel
+        await ctx.respond("You need to be a server admin to use this command!")
+        return
+
+    # repond success
+    await ctx.respond("Fetching events...")
+    await presence.post_events(bot, ctx, server_channels)
 
 
 bot.run(os.getenv("TOKEN"))  # run the bot with the token

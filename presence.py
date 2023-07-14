@@ -6,13 +6,14 @@ import requests
 import datetime
 import logging
 from dateutil.tz import tzutc, tzlocal
+import re
 
 
 # runs at 5:00pm PST on sundays, grabs events from https://api.presence.io/wsu/v1/events
 # filters by events that are listed for the next 7 days and posts them to the configured channel
 def fetch_week_events():
     # log
-    logging.log("Fetching events for the next 7 days...")
+    logging.info("Fetching events for the next 7 days...")
 
     raw_events = requests.get("https://api.presence.io/wsu/v1/events").json()
 
@@ -22,7 +23,7 @@ def fetch_week_events():
     # the last character is a Z, which means it's in UTC time
 
     # get the current time in UTC
-    current_time = datetime.utcnow()
+    current_time = datetime.datetime.utcnow()
 
     # create a list to store the filtered events
     filtered_events = []
@@ -42,18 +43,23 @@ def fetch_week_events():
         time_difference = start_time - current_time
 
         # if the event is within the next 7 days, add it to the list
-        if time_difference.days <= 7:
+        if time_difference.days <= 7 and time_difference.days >= 0:
             filtered_events.append(event)
 
+    # sort the events by start time
+    filtered_events.sort(
+        key=lambda event: datetime.datetime.strptime(
+            event["startDateTimeUtc"], "%Y-%m-%dT%H:%M:%SZ"
+        )
+    )
+
     # log
-    logging.log(f"Found {len(filtered_events)} events for the next 7 days")
+    logging.info(f"Found {len(filtered_events)} events for the next 7 days")
 
     return filtered_events
 
 
-def post_events(bot, ctx, server_channels):
-    events = fetch_week_events()
-
+async def post_events(bot, ctx, server_channels):
     # get the configured channel id for the server
     channel_id = server_channels.get(str(ctx.guild_id))
 
@@ -67,13 +73,28 @@ def post_events(bot, ctx, server_channels):
     # get the channel object from the channel id
     channel = bot.get_channel(channel_id)
 
+    if channel is None:
+        logging.error("The channel id is invalid!")
+        return
+
+    events = fetch_week_events()
+
+    # post a message to the channel letting the user
+    # know what week the bot is posting events for.
+    # posting n events for the week of m/d/y
+
+    await ctx.respond(
+        f"Posting {len(events)} events occurring this next week, after {datetime.datetime.now().strftime('%m/%d/%Y')}"
+    )
+
     # loop through all the events
     for event in events:
         # build a card embed
         embed = discord.Embed(
             title=event["eventName"],
-            description=event["description"],
-            url=event["url"],
+            # strip HTML from the description (note, this doesn't sanitize)
+            description=re.sub("<[^<]+?>", "", event["description"]),
+            url=f"https://wsu.presence.io/event/{event['uri']}",
             color=0xA60F2D,
         )
 
@@ -90,26 +111,26 @@ def post_events(bot, ctx, server_channels):
         )
 
         # check if the event has a photo
-        if event["photoUri"] is not None:
+        if "photoUri" in event:
             # add the event image
             embed.set_image(
-                url=f"https://wsu-cdn.presence.io/event-photos/{event['eventNoSqlId']/{event['photoUri']}}"
+                url=f"https://wsu-cdn.presence.io/event-photos/618a42cf-1860-4f89-9fd4-0f42bdbf546c/{event['photoUri']}"
             )
 
         # check if the event has a location
-        if event["location"] is not None:
+        if "location" in event:
             # add the location
             embed.add_field(name="Location", value=event["location"], inline=False)
 
         # check if the event has an organization
-        if event["organizationName"] is not None:
+        if "organizationName" in event:
             # add the organization
             embed.add_field(
                 name="Organization", value=event["organizationName"], inline=False
             )
 
         # check if the event has an rsvp link
-        if event["rsvpLink"] is not None:
+        if "rsvpLink" in event:
             # add the RSVP button
             embed.add_field(
                 name="RSVP",
@@ -118,7 +139,7 @@ def post_events(bot, ctx, server_channels):
             )
 
         # send the embed to the channel
-        channel.send(embed=embed)
+        await channel.send(embed=embed)
 
         # wait 1 second before sending the next embed
         time.sleep(1)
