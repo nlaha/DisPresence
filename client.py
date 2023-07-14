@@ -137,6 +137,9 @@ async def disable(ctx):
 
 @tasks.loop(seconds=1)
 async def schedule_task():
+    # this is essentially a background task that runs every second
+    # it doesn't do anything except check if the scheduler has any jobs
+    # that need to be executed, and if so, executes them
     schedule.run_pending()
 
 
