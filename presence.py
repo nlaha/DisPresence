@@ -92,24 +92,33 @@ def post_events(bot, guild_id, server_channels):
 
     # loop through all the events
     for event in events:
+        formatted_description = re.sub("<[^<]+?>", "", event["description"])
+
+        if len(formatted_description) > 1024:
+            formatted_description = formatted_description[:1021] + "..."
+
         # build a card embed
         embed = discord.Embed(
             title=event["eventName"],
             # strip HTML from the description (note, this doesn't sanitize)
-            description=re.sub("<[^<]+?>", "", event["description"]),
+            description=formatted_description,
             url=f"https://wsu.presence.io/event/{event['uri']}",
             color=0xA60F2D,
         )
 
         # add the event start time and convert it to a friendly
         # format using the dateutil library
+        formatted_time = (
+            datetime.datetime.strptime(event["startDateTimeUtc"], "%Y-%m-%dT%H:%M:%SZ")
+            .replace(tzinfo=datetime.timezone.utc)
+            .astimezone(tz=None)
+            .strftime("%A, %B %d, %Y at %I:%M %p")
+        )
+
+        logging.info(event["eventName"] + " | " + formatted_time)
         embed.add_field(
             name="Start Time",
-            value=datetime.datetime.strptime(
-                event["startDateTimeUtc"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-            .astimezone(tzlocal())
-            .strftime("%A, %B %d, %Y at %I:%M %p"),
+            value=formatted_time,
             inline=False,
         )
 
