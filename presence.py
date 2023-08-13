@@ -111,7 +111,7 @@ def post_events(bot, guild_id, server_channels):
         formatted_time = (
             datetime.datetime.strptime(event["startDateTimeUtc"], "%Y-%m-%dT%H:%M:%SZ")
             .replace(tzinfo=datetime.timezone.utc)
-            .astimezone(tz=None)
+            .astimezone(tz=datetime.timezone(datetime.timedelta(hours=-7)))
             .strftime("%A, %B %d, %Y at %I:%M %p")
         )
 
