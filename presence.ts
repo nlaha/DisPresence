@@ -20,8 +20,16 @@ const FILTERED_KEYWORDS = [
  * @returns A promise that resolves to an array of parsed events
  */
 export async function getNextWeekEvents(): Promise<ParsedPresenceEvent[]> {
-  // Fetch events from the API
-  const response = await fetch("https://api.presence.io/wsu/v1/dashboard/events");
+    // Fetch events from the API
+    const response = await fetch("https://api.presence.io/wsu/v1/dashboard/events");
+    // if the response is not OK, throw an error
+    if (!response.ok) {
+        logger.error(`Failed to fetch events from the Presence API: ${response.statusText}`);
+        // increment the presence errors counter
+        db.data.stats.presence_errors++;
+        db.write();
+    }
+
     const events: PresenceEvent[] = await response.json();
     
     // first, parse events into a more usable format
@@ -115,10 +123,10 @@ export async function postEvents(client: Client): Promise<void> {
  * @param guildId The guild ID to schedule the job for
  */
 export async function scheduleJob(client: Client, guildId: string): Promise<void> {
-    cron.schedule('* * * * *', () => {
+    cron.schedule('* * * * *', async () => {
     //cron.schedule('0 10 * * 0', function(){
         logger.log("[JOB] Running DisPresence worker for guild " + guildId);
-        postEvents(client);
+        await postEvents(client);
     }, {
         name: guildId,
         scheduled: true,

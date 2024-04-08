@@ -28,7 +28,7 @@ module.exports = {
       await db.write();
 
       // schedule the worker
-      scheduleJob(interaction.client, interaction.guildId);
+      await scheduleJob(interaction.client, interaction.guildId);
 
       await interaction.reply({
         content: "DisPresence has been enabled in this channel. Scheduled worker for Sunday at 10:00 AM.",

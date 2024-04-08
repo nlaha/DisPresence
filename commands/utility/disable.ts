@@ -29,7 +29,7 @@ module.exports = {
       await db.write()
 
       // cancel the worker
-      unscheduleJob(interaction.guildId);
+      await unscheduleJob(interaction.guildId);
 
       await interaction.reply({
           content: "DisPresence has been disabled in this channel.",

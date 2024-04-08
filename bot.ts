@@ -1,7 +1,7 @@
 import { REST, Routes, type Interaction } from "discord.js";
 import { JSONFilePreset } from "lowdb/node";
 import type { Database } from "./types";
-import { scheduleJob } from "./presence";
+import { postEvents, scheduleJob } from "./presence";
 const { logger } = require("./logger");
 
 // Require the necessary discord.js classes
@@ -61,9 +61,11 @@ client.once(Events.ClientReady, async (readyClient: typeof Client) => {
     logger.info(`Bot ready! Logged in as ${readyClient.user.tag}`);
     
     // schedule jobs for each guild present in the database
-    db.data.guild_configs.forEach((config) => {
-        scheduleJob(readyClient, config.guild_id);
+    db.data.guild_configs.forEach(async (config) => {
+        await scheduleJob(readyClient, config.guild_id);
     });
+
+    await postEvents(readyClient);
 });
 
 
