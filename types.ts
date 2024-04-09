@@ -30,7 +30,6 @@ export type GuildConfig = {
  */
 export type Stats = {
   presence_errors: number;
-  events_total: number;
   events_this_week: number;
 };
 

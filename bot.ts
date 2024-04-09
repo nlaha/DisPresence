@@ -17,7 +17,6 @@ export const db = await JSONFilePreset<Database>("bot_db.json", {
     guild_configs: [],
     stats: {
         presence_errors: 0,
-        events_total: 0,
         events_this_week: 0,
     },
     

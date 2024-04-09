@@ -1,4 +1,4 @@
-import type { Client, TextChannel } from "discord.js";
+import { ActivityType, type Client, type TextChannel } from "discord.js";
 import { type PresenceEvent, type ParsedEvent as ParsedPresenceEvent } from "./types";
 const { logger } = require("./logger");
 import { db } from "./bot";
@@ -85,6 +85,14 @@ export async function postEvents(client: Client): Promise<void> {
     logger.info("Posting events for the next week...");
     // get the next week's events
     let events = await getNextWeekEvents();
+    // update the stats
+    db.data.stats.events_this_week = events.length;
+    db.write();
+
+    client.user?.setActivity({
+        type: ActivityType.Watching,
+        name: `for ${events.length} events this week`,
+    });
 
     // sort events by start date
     events.sort((a, b) => a.startDateTimeUtc.getTime() - b.startDateTimeUtc.getTime());
@@ -109,7 +117,7 @@ export async function postEvents(client: Client): Promise<void> {
             content: "",
             embeds: [
                 {
-                    title: events.length > 0 ? "Upcoming Events in the Next Week (Max 25 Shown)" : "No Upcoming Events in the Next Week",
+                    title: events.length > 0 ? `Upcoming ${events.length} Events in the Next Week (Max 25 Shown)` : "No Upcoming Events in the Next Week",
                     // WSU crimson
                     color: 10038562,
                     fields: events.map((event) => {
