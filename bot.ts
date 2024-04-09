@@ -64,8 +64,6 @@ client.once(Events.ClientReady, async (readyClient: typeof Client) => {
     db.data.guild_configs.forEach(async (config) => {
         await scheduleJob(readyClient, config.guild_id);
     });
-
-    await postEvents(readyClient);
 });
 
 

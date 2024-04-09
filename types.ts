@@ -62,6 +62,7 @@ export type PresenceEvent = {
   isVirtualEventLink: boolean;
   hasVirtualEventIntegration: boolean;
   hasEventEnded: boolean;
+  rsvpLink: string;
   contactName: string;
   contactEmail: string;
   hasCoverImage: boolean;
@@ -71,6 +72,7 @@ export type PresenceEvent = {
   startDateTimeUtc: string;
   endDateTimeUtc: string;
   statusId: number;
+  tags: string[];
 }
 
 /**
@@ -82,15 +84,15 @@ export type PresenceEvent = {
  * @property {Date} end - The event end date
  * @property {string} description - The event description
  * @property {boolean} isVirtualEvent - Whether the event is virtual
- * @property {string} uri - The event URI postfix, is not a valid URL, will need to be appended to the base URL
+ * @property {string} uri - The event URI
  */
 export type ParsedEvent = {
-    name: string;
+    eventName: string;
     location: string;
-    organization: string;
-    start: Date;
-    end: Date;
+    organizationName: string;
+    startDateTimeUtc: Date;
+    endDateTimeUtc: Date;
     description: string;
-    isVirtualEvent: boolean;
+    isVirtualEventLink: boolean;
     uri: string;
 }

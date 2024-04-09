@@ -8,7 +8,7 @@ const cron = require("node-cron");
 const FILTERED_KEYWORDS = [
     "greek", "fraternity", "sorority", "religious", "church", "temple", "mosque",
     "synagogue", "prayer", "worship", "faith", "god", "jesus", "allah", "buddha",
-    "hindu", "christian", "muslim", "jewish", "buddhist", "hinduism", "christianity",
+    "hindu", "christian", "muslim", "jewish", "buddhist", "hinduism", "christianity", "catholic",
     "islam", "judaism", "buddhism", "religious", "spiritual", "spirituality",
     "spiritualism", "spiritualist", "spiritualistic", "spiritualistic", "spiritualistic",
     "kappa", "alpha", "delta", "sigma", "phi", "theta", "omega", "beta", "gamma",
@@ -21,7 +21,7 @@ const FILTERED_KEYWORDS = [
  */
 export async function getNextWeekEvents(): Promise<ParsedPresenceEvent[]> {
     // Fetch events from the API
-    const response = await fetch("https://api.presence.io/wsu/v1/dashboard/events");
+    const response = await fetch("https://api.presence.io/wsu/v1/events");
     // if the response is not OK, throw an error
     if (!response.ok) {
         logger.error(`Failed to fetch events from the Presence API: ${response.statusText}`);
@@ -30,36 +30,44 @@ export async function getNextWeekEvents(): Promise<ParsedPresenceEvent[]> {
         db.write();
     }
 
-    const events: PresenceEvent[] = await response.json();
+    const responseJson = await response.json();
+    const events: PresenceEvent[] = responseJson;
     
     // first, parse events into a more usable format
     const parsedEvents = events.map((event: PresenceEvent): ParsedPresenceEvent => {
         // dates are of format "%Y-%m-%dT%H:%M:%SZ"
         const startDate = new Date(event.startDateTimeUtc);
         const endDate = new Date(event.endDateTimeUtc);
+        if (event.description === null) {
+            logger.warn(`Event ${event.eventName} has no description.`);
+        }
         return {
-            name: event.eventName,
-            location: event.location,
-            organization: event.organizationName,
-            start: startDate,
-            end: endDate,
-            description: event.description,
-            isVirtualEvent: event.isVirtualEventLink,
-            uri: `https://wsu.presence.io/event/${event.uri}`,
+            eventName: event.eventName || "No Name",
+            location: event.location || "No Location",
+            organizationName: event.organizationName || "",
+            startDateTimeUtc: startDate || new Date(),
+            endDateTimeUtc: endDate || new Date(),
+            description: event.description || "No Description",
+            isVirtualEventLink: event.isVirtualEventLink || false,
+            uri: `https://wsu.presence.io/event/${event.uri}` || "https://wsu.presence.io",
         };
     }).filter((event: ParsedPresenceEvent) => {
         // filter out events that have already ended and are not within the next week
         const now = new Date();
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
-        let res = event.end >= now && event.start <= nextWeek;
+        let res = event.startDateTimeUtc >= now && event.startDateTimeUtc <= nextWeek;
+        
         // also filter out greek life events and religious events
-        // simply do a search for a list of keywords in the event name and description
+        // simply do a search for a list of keywords in the event name, description and organization name
         // if there are any matches, filter out the event
         for (const keyword of FILTERED_KEYWORDS) {
-            if (event.name.toLowerCase().includes(keyword) || event.description.toLowerCase().includes(keyword)) {
-                res = false;
-                break;
+            if (
+                event.eventName.toLowerCase().includes(keyword) ||
+                event.description.toLowerCase().includes(keyword) ||
+                event.organizationName.toLowerCase().includes(keyword)) {
+                    res = false;
+                    break;
             }
         }
 
@@ -74,11 +82,12 @@ export async function getNextWeekEvents(): Promise<ParsedPresenceEvent[]> {
  * @param client The Discord client
  */
 export async function postEvents(client: Client): Promise<void> {
+    logger.info("Posting events for the next week...");
     // get the next week's events
     let events = await getNextWeekEvents();
 
     // sort events by start date
-    events.sort((a, b) => a.start.getTime() - b.start.getTime());
+    events.sort((a, b) => a.startDateTimeUtc.getTime() - b.startDateTimeUtc.getTime());
     // limit to 25 events
     events = events.slice(0, 25);
 
@@ -90,31 +99,38 @@ export async function postEvents(client: Client): Promise<void> {
         const channel = client.channels.cache.get(config.channel_id) as TextChannel;
         if (!channel) {
             logger.warn(`Channel with ID ${config.channel_id} not found. Skipping posting events.`);
-            return;
+            return Promise.reject(`Channel with ID ${config.channel_id} not found.`);
         }
         
         // post the events
         // this will be one big message with all the events as links
         // use discord.js embeds to make it look nice, each event will be a field
         channel.send({
-            content: "Here are the events for the next week (max 25):",
+            content: "",
             embeds: [
                 {
-                    title: "Events",
+                    title: events.length > 0 ? "Upcoming Events in the Next Week (Max 25 Shown)" : "No Upcoming Events in the Next Week",
+                    // WSU crimson
+                    color: 10038562,
                     fields: events.map((event) => {
+                        const localStartTime = event.startDateTimeUtc.toLocaleTimeString([], { timeStyle: 'short', timeZone: 'America/Los_Angeles'});
+                        const localEndTime = event.endDateTimeUtc.toLocaleTimeString([], { timeStyle: 'short', timeZone: 'America/Los_Angeles'});
                         return {
-                            name: event.name,
-                            value: `**Organization:** ${event.organization}\n**Location:** ${event.location}\n**Start:** ${event.start.toUTCString()}\n**End:** ${event.end.toUTCString()}\n**Description:** ${event.description}\n**Virtual Event:** ${event.isVirtualEvent ? "Yes" : "No"}\n[Link to Event](${event.uri})`,
+                            name: `${event.startDateTimeUtc.toDateString()} - ${localStartTime} to ${localEndTime}`,
+                            value: `[${event.eventName} - ${event.organizationName}](${event.uri})`,
                         };
                     }),
                     // add "See more" link to the bottom
                     footer: {
                         text: "For more events, visit https://wsu.presence.io",
                     },
+                    timestamp: new Date().toISOString(),
                 },
             ],
         });
     });
+
+    return Promise.resolve();
 }
 
 /**
@@ -123,13 +139,10 @@ export async function postEvents(client: Client): Promise<void> {
  * @param guildId The guild ID to schedule the job for
  */
 export async function scheduleJob(client: Client, guildId: string): Promise<void> {
-    cron.schedule('* * * * *', async () => {
-    //cron.schedule('0 10 * * 0', function(){
-        logger.log("[JOB] Running DisPresence worker for guild " + guildId);
-        await postEvents(client);
-    }, {
+
+    // schedule a job to post events every Sunday at 10:00 AM
+    cron.schedule('0 10 * * 0', () => postEvents(client).catch((e) => logger.error(e)), {
         name: guildId,
-        scheduled: true,
         timezone: "America/Los_Angeles"
     });
 
