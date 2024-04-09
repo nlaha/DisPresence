@@ -1,5 +1,6 @@
-import type { CommandInteraction, Guild } from "discord.js";
+import { type CommandInteraction, type Guild } from "discord.js";
 import type { GuildConfig } from "../../types";
+const { PermissionFlagsBits } = require("discord.js");
 const { unscheduleJob } = require("../../presence");
 const { SlashCommandBuilder } = require("discord.js");
 const { logger } = require("../../logger");
@@ -8,7 +9,9 @@ const { db } = require("../../bot");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("disable")
-    .setDescription("Disable DisPresence worker in the current channel"),
+    .setDescription("Disable DisPresence worker in the current channel")
+    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
+    .setDMPermission(false),
   async execute(interaction: CommandInteraction) {
     // make sure guild id is not null
     if (!interaction.guildId) {
