@@ -1,6 +1,6 @@
 import { REST, Routes, type Interaction } from "discord.js";
 import { JSONFilePreset } from "lowdb/node";
-import type { Database } from "./types";
+import type { BotCommand, Database } from "./types";
 import { postEvents, scheduleJob } from "./presence";
 const { logger } = require("./logger");
 
@@ -64,6 +64,26 @@ client.once(Events.ClientReady, async (readyClient: typeof Client) => {
     db.data.guild_configs.forEach(async (config) => {
         await scheduleJob(readyClient, config.guild_id);
     });
+  
+    // register slash commands if the CLI argument '--reload-command' is present
+    if (process.argv.includes("--reload-commands")) {
+      const commands = client.commands.map((command: BotCommand) => command.data.toJSON());
+      const rest = new REST().setToken(process.env.TOKEN || "");
+      try {
+        logger.info(
+          `Started refreshing ${commands.length} application (/) commands.`
+        );
+        await rest.put(
+          Routes.applicationCommands(client.user.id),
+          { body: commands },
+        );
+        logger.info(
+          `Successfully reloaded ${commands.length} application (/) commands.`
+        );
+      } catch (error) {
+        logger.error(error);
+      }
+    }
 });
 
 

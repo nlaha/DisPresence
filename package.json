@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "bun bot.ts",
-    "refresh_commands": "bun refresh-commands.ts"
+    "reload": "bun refresh_commands.ts"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
