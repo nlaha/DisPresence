@@ -1,4 +1,6 @@
 # DisPresence
+[![CodeQL Advanced](https://github.com/nlaha/DisPresence/actions/workflows/codeql.yml/badge.svg)](https://github.com/nlaha/DisPresence/actions/workflows/codeql.yml)
+
 A discord bot that downloads updates from presence.io sites
 
 ## Hosting
